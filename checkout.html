@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>TicketHub Checkout (Demo) — RainCheck</title>
+  <link rel="stylesheet" href="styles.css" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+</head>
+<body class="demoSite">
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo" aria-hidden="true">🎟️</div>
+      <div>
+        <div class="brandName">TicketHub <span class="beta">DEMO</span></div>
+        <div class="brandTag">Checkout mock for RainCheck overlay</div>
+      </div>
+    </div>
+
+    <nav class="nav">
+      <a href="index.html">RainCheck Home</a>
+      <a href="explore.html">Explore events</a>
+      <a href="claim.html">Claim Demo</a>
+    </nav>
+  </header>
+
+  <main class="wrap">
+    <div class="split">
+      <section class="card">
+        <div class="row space">
+          <div>
+            <div class="kicker">Event</div>
+            <div class="eventMedia" style="height:180px; margin-top:10px;">
+              <img id="eventImage" alt="Event image" style="display:none;" />
+            </div>
+            <div class="cardTitle" id="eventName">Summer Stadium Concert</div>
+            <div class="muted" id="eventMeta">Sat • 7:30 PM • Outdoor Venue</div>
+            <div class="muted small" id="eventVenue">—</div>
+          </div>
+          <div class="tag good" id="eligTag">Rainline available</div>
+        </div>
+
+        <hr class="sep"/>
+
+        <div class="row space">
+          <div>
+            <div class="label">Tickets</div>
+          </div>
+          <div class="qty">
+            <button class="iconBtn" data-action="dec" aria-label="decrease">−</button>
+            <span id="qty">2</span>
+            <button class="iconBtn" data-action="inc" aria-label="increase">+</button>
+          </div>
+        </div>
+
+        <div class="lineItems">
+          <div class="li">
+            <span>Ticket price</span>
+            <span id="ticketPrice">$150.00</span>
+          </div>
+          <div class="li" id="rainStakeRow" style="display:none;">
+            <span>Rainline stake</span>
+            <span id="rainStake">$0.00</span>
+          </div>
+          <div class="li">
+            <span>Service fee</span>
+            <span id="svcFee">$22.50</span>
+          </div>
+          <div class="li">
+            <span>Order processing</span>
+            <span id="procFee">$6.00</span>
+          </div>
+        </div>
+
+        <hr class="sep"/>
+
+        <div class="row space bigTotal">
+          <span>Total</span>
+          <span id="grandTotal">$357.00</span>
+        </div>
+
+        <div class="row space">
+          <button class="btn primary" id="payBtn">Pay now</button>
+          <button class="btn" id="toggleExtensionBtn">Toggle RainCheck panel</button>
+        </div>
+
+        <div class="muted small">
+          Tip: Pick an event in <a href="explore.html" class="link">Explore</a>, then come here — it’ll prefill the checkout.
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- RainCheck Extension Panel -->
+  <div class="rcPanel" id="rcPanel" aria-hidden="false">
+    <div class="rcHeader">
+      <div class="rcBrand">
+        <span class="rcIcon">☔</span>
+        <div>
+          <div class="rcName">RainCheck</div>
+          <div class="rcSub">Rain refund protection</div>
+        </div>
+      </div>
+      <button class="iconBtn" id="closePanel" aria-label="close">✕</button>
+    </div>
+
+    <div class="rcBody">
+      <div class="rcAlert" id="forecastBox">
+        <div class="rcAlertTitle">Weather snapshot</div>
+        <div class="rcAlertText" id="forecastText">Fetching precipitation forecast…</div>
+      </div>
+
+      <div class="rcSection" id="rainlineSection">
+        <div class="rcCard">
+          <div class="rcCardTitle">Pick your Rain Line</div>
+          <div class="muted small" style="margin-top:-2px;">
+            You pay a stake. If rainfall during the event meets or exceeds your line, you win a payout.
+            If it doesn’t, you lose the stake.
+          </div>
+
+          <div style="margin-top:12px;">
+            <div class="row space">
+              <div class="label">Rain line (inches)</div>
+              <div class="mono" id="rainLineValue">0.25"</div>
+            </div>
+            <input id="rainLine" type="range" min="0.01" max="1.50" step="0.01" value="0.25" />
+          </div>
+
+          <div class="grid2" style="margin-top:12px;">
+            <div class="miniStat">
+              <div class="label">Estimated win chance</div>
+              <div class="statValue" id="winChance">—</div>
+              <div class="muted small">Based on forecast uncertainty model (demo).</div>
+            </div>
+            <div class="miniStat">
+              <div class="label">Stake</div>
+              <div class="statValue">
+                <span id="stakeAmt">$10.00</span>
+              </div>
+              <div class="muted small">Base price is $10. You can increase it.</div>
+              <input id="stakeInput" type="number" min="10" step="1" value="10" style="margin-top:8px; width:100%;" />
+            </div>
+          </div>
+
+          <div class="grid2" style="margin-top:12px;">
+            <div class="miniStat">
+              <div class="label">Payout if line hits</div>
+              <div class="statValue" id="payoutAmt">—</div>
+              <div class="muted small">Pays out to you (demo).</div>
+            </div>
+            <div class="miniStat">
+              <div class="label">Coverage level</div>
+              <div class="statValue" id="coveragePct">—</div>
+              <div class="muted small">Higher line → higher payout, lower chance.</div>
+            </div>
+          </div>
+
+          <button class="btn primary full" id="placeBet" style="margin-top:14px;">Place Rainline</button>
+          <div class="muted small" style="margin-top:10px;">
+            Settlement uses precipitation near the venue during the event window.
+            If the event is too far out, forecasts may be unavailable.
+          </div>
+        </div>
+
+        <div class="decision neutral" id="betResult" style="display:none;">
+          <div class="decisionTitle" id="betTitle">—</div>
+          <div class="decisionText" id="betText">—</div>
+        </div>
+      </div>
+    </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

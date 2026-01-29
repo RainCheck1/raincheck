@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Explore Events — RainCheck</title>
+  <link rel="stylesheet" href="styles.css" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo" aria-hidden="true">☔</div>
+      <div>
+        <div class="brandName">RainCheck Explorer <span class="beta">DEMO</span></div>
+        <div class="brandTag">Search live Ticketmaster events, then add RainCheck at checkout</div>
+      </div>
+    </div>
+
+    <nav class="nav">
+      <a href="index.html">Home</a>
+      <a href="claim.html">Claim</a>
+    </nav>
+  </header>
+
+  <main class="wrap">
+    <section class="heroCard">
+      <div class="heroCopy">
+        <div class="eyebrow">Discovery</div>
+        <h1 class="h1">Find an event.</h1>
+        <p class="lead">
+          Search by keyword + city (optional). Click any event card to open the checkout with RainCheck ready.
+        </p>
+      </div>
+
+      <div class="heroForm card">
+        <div class="formGrid">
+          <div>
+            <div class="label">Keyword</div>
+            <input id="keyword" type="text" placeholder="e.g. Drake, Coldplay, NBA, Festival" />
+          </div>
+
+          <div>
+            <div class="label">City</div>
+            <input id="city" type="text" placeholder="e.g. Toronto, Vancouver, Seattle" />
+          </div>
+
+          <div>
+            <div class="label">Start date</div>
+            <input id="startDate" type="date" />
+          </div>
+
+          <div>
+            <div class="label">End date</div>
+            <input id="endDate" type="date" />
+          </div>
+
+          <div class="row" style="gap:10px; align-items:flex-end;">
+            <button class="btn primary" id="searchBtn" style="width:100%;">Search</button>
+            <button class="btn" id="clearBtn">Clear</button>
+          </div>
+        </div>
+
+        <div class="muted small" style="margin-top:10px;">
+          Demo uses an embedded Ticketmaster API key. Results are live.
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="row space">
+        <h2 style="margin:0;">Results</h2>
+        <div class="muted small" id="resultMeta">—</div>
+      </div>
+
+      <div id="results" class="eventGrid" aria-live="polite"></div>
+    </section>
+
+    <footer class="footer">
+      <div class="muted">RainCheck demo — static site running on localhost.</div>
+    </footer>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

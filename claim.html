@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>RainCheck Claim (Demo)</title>
+  <link rel="stylesheet" href="styles.css" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo" aria-hidden="true">☔</div>
+      <div>
+        <div class="brandName">RainCheck</div>
+        <div class="brandTag">Claim flow demo (local)</div>
+      </div>
+    </div>
+
+    <nav class="nav">
+      <a href="index.html">Home</a>
+      <a href="checkout.html">Checkout Demo</a>
+    </nav>
+  </header>
+
+  <main class="wrap">
+    <section class="card">
+      <div class="row space">
+        <div>
+          <div class="cardTitle">File a claim</div>
+          <div class="muted">This simulates the refund workflow after a weather cancellation.</div>
+        </div>
+        <button class="btn" id="loadPurchase">Load last “purchase”</button>
+      </div>
+
+      <hr class="sep"/>
+
+      <div class="grid2">
+        <div>
+          <div class="label">Order</div>
+          <div class="mono box" id="orderBox">No order loaded yet.</div>
+
+          <div class="card" style="margin-top:14px;">
+            <div class="cardTitle">Claim demo</div>
+            <div class="muted">
+              In the real product, Rainline settles after the event ends using verified outcomes.
+              For this demo, pick a result and we’ll settle instantly.
+            </div>
+
+            <div style="margin-top:12px;" class="demoControls">
+              <label class="row" style="gap:10px;">
+                <input type="radio" name="demoOutcome" id="demoWon" value="won" checked />
+                <span class="label">I won (rainline hit)</span>
+              </label>
+              <label class="row" style="gap:10px; margin-top:8px;">
+                <input type="radio" name="demoOutcome" id="demoLost" value="lost" />
+                <span class="label">I lost (rainline missed)</span>
+              </label>
+            </div>
+
+            <button class="btn primary" id="submitClaim" style="margin-top:12px;">Settle Rainline (demo)</button>
+            <div class="muted small" style="margin-top:10px;">
+              If your last order didn’t include a Rainline bet, go to Checkout and place RainCheck first.
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="card">
+            <div class="cardTitle">Settlement</div>
+            <div class="muted">This screen settles your saved Rainline bet (demo mode).</div>
+            <div id="decision" class="decision neutral">
+              <div class="decisionTitle">Awaiting claim…</div>
+              <div class="decisionText">Load a purchase, then submit a claim.</div>
+            </div>
+
+            <div class="lineItems" style="margin-top:14px;">
+              <div class="li">
+                <span>Payout amount</span>
+                <span class="mono" id="refundAmt">$0.00</span>
+              </div>
+              <div class="li">
+                <span>Status</span>
+                <span class="mono" id="refundStatus">—</span>
+              </div>
+            </div>
+
+            <div class="muted small" style="margin-top:10px;">
+              Note: This is a prototype. Real claims require robust verification + underwriting/compliance.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <div class="muted">Tip: Go to the Checkout Demo, place a Rainline bet, then come back here.</div>
+    </footer>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
