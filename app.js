@@ -98,9 +98,11 @@ async function fetchTicketmasterEvents({ keyword, city, startDate, endDate, page
     }
     if (hasUserCity) params.set("city", city.trim());
     if (Number.isFinite(page) && page >= 0) params.set("page", String(page));
-    // Date window: only apply when the user provides a date filter.
+    // Always show upcoming events. Respect user-provided start date if set.
     if (startDate) {
       params.set("startDateTime", toTicketmasterIso(new Date(startDate)));
+    } else {
+      params.set("startDateTime", toTicketmasterIso(new Date()));
     }
 
     if (endDate) {
@@ -212,7 +214,7 @@ const url = `https://app.ticketmaster.com/discovery/v2/events.json?${params.toSt
         results.appendChild(el);
       }
       totalLoaded += list.length;
-      resultMeta.textContent = `Live results · ${totalLoaded} events`;
+      resultMeta.textContent = "Live Results";
     }
 
     function buildSearchState() {
@@ -226,10 +228,7 @@ const url = `https://app.ticketmaster.com/discovery/v2/events.json?${params.toSt
       const seededKeyword = (!hasUserKeyword && !hasUserCity && !hasUserDates)
         ? seedOptions[Math.floor(Math.random() * seedOptions.length)]
         : "";
-      const startPage = (!hasUserKeyword && !hasUserCity && !hasUserDates)
-        ? Math.floor(Math.random() * 3)
-        : 0;
-      return { keyword: q, city: c, startDate: sd, endDate: ed, seededKeyword, page: startPage };
+      return { keyword: q, city: c, startDate: sd, endDate: ed, seededKeyword, page: 0 };
     }
 
     async function loadNextPage({ append } = { append: true }) {
