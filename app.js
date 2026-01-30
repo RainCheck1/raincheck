@@ -73,25 +73,42 @@
       .replaceAll("'", "&#039;");
   }
 
-  async function fetchTicketmasterEvents({ keyword, city, startDate, endDate }) {
+  function toTicketmasterIso(d) {
+  // Ticketmaster requires YYYY-MM-DDTHH:mm:ssZ (no milliseconds)
+  return d.toISOString().replace(/\.\d{3}Z$/, "Z");
+}
+
+async function fetchTicketmasterEvents({ keyword, city, startDate, endDate, page = 0, seededKeyword = "" }) {
     const params = new URLSearchParams();
     params.set("apikey", TICKETMASTER_API_KEY);
     params.set("size", "30");
     params.set("sort", "date,asc");
 
-    // If user gives nothing, seed a broad keyword so we still show results.
-    const seededKeyword = (keyword && keyword.trim()) ? keyword.trim() : "music";
-    if (seededKeyword) params.set("keyword", seededKeyword);
-    if (city && city.trim()) params.set("city", city.trim());
+    // Only apply a random keyword when the user hasn't provided any filters.
+    const seedOptions = ["music","festival","comedy","sports","theatre","rock","pop"];
+    const hasUserKeyword = (keyword && keyword.trim());
+    const hasUserCity = (city && city.trim());
+    const hasUserDates = !!(startDate || endDate);
+    if (hasUserKeyword) params.set("keyword", keyword.trim());
+    else if (!hasUserCity && !hasUserDates) {
+      const seed = (seededKeyword && seededKeyword.trim())
+        ? seededKeyword.trim()
+        : seedOptions[Math.floor(Math.random() * seedOptions.length)];
+      params.set("keyword", seed);
+    }
+    if (hasUserCity) params.set("city", city.trim());
+    if (Number.isFinite(page) && page >= 0) params.set("page", String(page));
+    // Date window: only apply when the user provides a date filter.
+    if (startDate) {
+      params.set("startDateTime", toTicketmasterIso(new Date(startDate)));
+    }
 
-    if (startDate) params.set("startDateTime", new Date(startDate).toISOString());
     if (endDate) {
       const e = new Date(endDate);
       e.setHours(23, 59, 59, 999);
-      params.set("endDateTime", e.toISOString());
+      params.set("endDateTime", toTicketmasterIso(e));
     }
-
-    const url = `https://app.ticketmaster.com/discovery/v2/events.json?${params.toString()}`;
+const url = `https://app.ticketmaster.com/discovery/v2/events.json?${params.toString()}`;
     const res = await fetch(url);
     if (!res.ok) {
       const txt = await res.text().catch(() => "");
@@ -100,7 +117,7 @@
     const data = await res.json();
 
     const embedded = data?._embedded?.events || [];
-    return embedded.map(ev => {
+    const events = embedded.map(ev => {
       const venue = ev?._embedded?.venues?.[0];
       const attractions = ev?._embedded?.attractions || [];
       const artists = attractions.map(a => a?.name).filter(Boolean);
@@ -126,6 +143,11 @@
         imageUrl: pickBestImage(ev?.images)
       };
     });
+    const pageInfo = {
+      number: data?.page?.number ?? page,
+      totalPages: data?.page?.totalPages ?? null
+    };
+    return { events, pageInfo };
   }
 
   // ---------- Explore page ----------
@@ -139,25 +161,36 @@
     const clearBtn = $("#clearBtn");
     const results = $("#results");
     const resultMeta = $("#resultMeta");
+    const seedOptions = ["music","festival","comedy","sports","theatre","rock","pop"];
+    let searchState = null;
+    let isLoading = false;
+    let hasMore = true;
+    let totalLoaded = 0;
+    let sentinel = null;
 
-    function renderEvents(list, metaText) {
-      results.innerHTML = "";
-      resultMeta.textContent = metaText || `${list.length} events`;
+    function renderEvents(list, metaText, { append = false } = {}) {
+      if (!append) {
+        results.innerHTML = "";
+        totalLoaded = 0;
+      }
+      resultMeta.textContent = metaText || `${totalLoaded} events`;
 
       if (!list.length) {
-        results.innerHTML = `<div class="card" style="grid-column:1/-1;">
-          <div class="cardTitle">No results</div>
-          <div class="muted">Try a different keyword or city.</div>
-        </div>`;
+        if (!append) {
+          results.innerHTML = `<div class="card" style="grid-column:1/-1;">
+            <div class="cardTitle">No results</div>
+            <div class="muted">Try a different keyword or city.</div>
+          </div>`;
+        } else {
+          resultMeta.textContent = `Live results · ${totalLoaded} events`;
+        }
         return;
       }
 
       for (const ev of list) {
         const chips = [
-          `<span class="chip ${ev.outdoor ? "good" : "bad"}">${ev.outdoor ? "Outdoor" : "Indoor"}</span>`,
           ev.type ? `<span class="chip">${escapeHtml(ev.type)}</span>` : "",
-          (ev.city || ev.country) ? `<span class="chip">${escapeHtml(ev.city)}${ev.country ? ", " + escapeHtml(ev.country) : ""}</span>` : "",
-        ].filter(Boolean).join("");
+          (ev.city || ev.country) ? `<span class="chip">${escapeHtml(ev.city)}${ev.country ? ", " + escapeHtml(ev.country) : ""}</span>` : ""].filter(Boolean).join("");
 
         const artists = (ev.artists && ev.artists.length) ? ev.artists.slice(0,3).join(" • ") : "";
         const price = (ev.minPrice != null && ev.maxPrice != null) ? `${money(ev.minPrice)}–${money(ev.maxPrice)}` : "—";
@@ -169,7 +202,7 @@
           <div class="eventTitle">${escapeHtml(ev.name)}</div>
           <div class="eventMeta">${artists ? escapeHtml(artists) + " · " : ""}${escapeHtml(isoToNice(ev.dateTime || ""))}</div>
           <div class="eventMeta">${escapeHtml(ev.venue || "Venue")} · ${escapeHtml(ev.city || "")}</div>
-          <div class="eventTags">${chips}<span class="chip">From: ${escapeHtml(price)}</span></div>
+          <div class="eventTags">${chips}</div>
           <div class="muted small">Click to open checkout</div>
         `;
         el.addEventListener("click", () => {
@@ -178,22 +211,62 @@
         });
         results.appendChild(el);
       }
+      totalLoaded += list.length;
+      resultMeta.textContent = `Live results · ${totalLoaded} events`;
     }
 
-    async function runSearch() {
+    function buildSearchState() {
       const q = (keyword.value || "").trim();
       const c = (city.value || "").trim();
       const sd = startDate.value || "";
       const ed = endDate.value || "";
+      const hasUserKeyword = !!q;
+      const hasUserCity = !!c;
+      const hasUserDates = !!(sd || ed);
+      const seededKeyword = (!hasUserKeyword && !hasUserCity && !hasUserDates)
+        ? seedOptions[Math.floor(Math.random() * seedOptions.length)]
+        : "";
+      const startPage = (!hasUserKeyword && !hasUserCity && !hasUserDates)
+        ? Math.floor(Math.random() * 3)
+        : 0;
+      return { keyword: q, city: c, startDate: sd, endDate: ed, seededKeyword, page: startPage };
+    }
 
+    async function loadNextPage({ append } = { append: true }) {
+      if (isLoading || !hasMore || !searchState) return;
+      isLoading = true;
+      resultMeta.textContent = append ? "Loading more…" : "Searching…";
+      try {
+        const { events, pageInfo } = await fetchTicketmasterEvents(searchState);
+        renderEvents(events, null, { append });
+        const currentPage = pageInfo?.number ?? searchState.page;
+        if (pageInfo?.totalPages != null && currentPage >= pageInfo.totalPages - 1) {
+          hasMore = false;
+        }
+        if (!events.length) {
+          hasMore = false;
+        }
+        searchState.page = currentPage + 1;
+      } catch (err) {
+        console.error(err);
+        if (!append) {
+          renderEvents([], `Error: ${err?.message || err}`);
+        } else {
+          resultMeta.textContent = `Error: ${err?.message || err}`;
+          hasMore = false;
+        }
+      } finally {
+        isLoading = false;
+      }
+    }
+
+    async function runSearch() {
       searchBtn.disabled = true;
       searchBtn.textContent = "Searching…";
       try {
-        const list = await fetchTicketmasterEvents({ keyword: q, city: c, startDate: sd, endDate: ed });
-        renderEvents(list, `Live results · ${list.length} events`);
-      } catch (err) {
-        console.error(err);
-        renderEvents([], `Error: ${err?.message || err}`);
+        searchState = buildSearchState();
+        hasMore = true;
+        await loadNextPage({ append: false });
       } finally {
         searchBtn.disabled = false;
         searchBtn.textContent = "Search";
@@ -209,6 +282,33 @@
       runSearch();
     });
 
+    function initInfiniteScroll() {
+      if (!results || sentinel) return;
+      sentinel = document.createElement("div");
+      sentinel.id = "scrollSentinel";
+      sentinel.style.height = "1px";
+      results.insertAdjacentElement("afterend", sentinel);
+
+      if ("IntersectionObserver" in window) {
+        const io = new IntersectionObserver((entries) => {
+          if (entries.some(e => e.isIntersecting)) loadNextPage({ append: true });
+        }, { root: null, rootMargin: "200px" });
+        io.observe(sentinel);
+      } else {
+        let ticking = false;
+        window.addEventListener("scroll", () => {
+          if (ticking) return;
+          ticking = true;
+          requestAnimationFrame(() => {
+            ticking = false;
+            const nearBottom = window.innerHeight + window.scrollY >= document.body.offsetHeight - 300;
+            if (nearBottom) loadNextPage({ append: true });
+          });
+        });
+      }
+    }
+
+    initInfiniteScroll();
     // initial
     runSearch();
   }
@@ -231,8 +331,9 @@
     const svcRate = 0.15; // mock platform fees (Ticket sites vary; keep stable for demo)
     const procFee = 6.0;
 
-    let qty = 2;
-    let isOutdoor = true;
+    let qty = 1;
+
+let isOutdoor = true;
 
     // Rainline stake (base price)
     let stake = 10.00;           // what user pays to play (user may increase)
@@ -335,15 +436,10 @@
 
       elProcFee.textContent = money(procFee);
 
-      // Rainline stake line item (only one)
+      // Rainline stake line item (always visible in its own section)
       if (elRainStakeRow && elRainStake) {
-        if (rainStake > 0) {
-          elRainStakeRow.style.display = "flex";
-          elRainStake.textContent = money(rainStake);
-        } else {
-          elRainStakeRow.style.display = "none";
-          elRainStake.textContent = money(0);
-        }
+        elRainStakeRow.style.display = "flex";
+        elRainStake.textContent = money(rainStake > 0 ? rainStake : 0);
       }
 
       elGrandTotal.textContent = baseTicket > 0 ? money(grand) : "—";
@@ -403,8 +499,14 @@
     // "payout if win" value (not including stake back), capped elsewhere.
     // House keeps a small vig (~10%) so expected value stays slightly negative.
     function payoutMultiplierFromP(p) {
-      const vig = 0.10;
-      return (1 / clamp(p, 0.02, 0.98)) * (1 - vig);
+      // House-favored, risk-reward curve:
+      // - High win chance (betting below/near the forecast) => low multiplier (small upside)
+      // - Low win chance (riskier line) => multiplier grows superlinearly
+      // Expected value stays negative due to vig + the houseEdge already applied to p.
+      const vig = 0.22;           // bigger = more house edge
+      const expo = 1.35;          // >1 makes payouts grow faster as p shrinks (more risk, more reward)
+      const pClamped = clamp(p, 0.03, 0.97);
+      return Math.pow(1 / pClamped, expo) * (1 - vig);
     }
 
     async function fetchPrecipProjection({ lat, lon, eventIso }) {
@@ -578,65 +680,83 @@
       updateRainLineUI();
     }
 
+    let stakeInputTouched = false;
+
+    function minStakeForTicket(ticketSubtotal) {
+      const pct = ticketSubtotal > 0 ? (ticketSubtotal * 0.10) : 0;
+      return Math.max(10, pct);
+    }
+
+    function readStakeInput(minStake) {
+      if (!stakeInput) return { valid: false, empty: true, value: null, reason: "missing" };
+      const raw = String(stakeInput.value ?? "").trim();
+      if (!raw) return { valid: false, empty: true, value: null, reason: "empty" };
+      const n = Number(raw);
+      if (!Number.isFinite(n) || n <= 0) return { valid: false, empty: false, value: null, reason: "invalid" };
+      if (n < minStake) return { valid: false, empty: false, value: n, reason: "below_min" };
+      return { valid: true, empty: false, value: n, reason: "ok" };
+    }
+
     function updateRainLineUI() {
       const line = Number(rainLine.value || 0);
       rainLineValue.textContent = `${line.toFixed(2)}"`;
 
       const fees = computeFees();
-      const ticketPriceCap = fees.ticketSubtotal; // "ticket price" (before fees)
+      const ticketSubtotal = fees.ticketSubtotal; // ticket price * qty (before fees)
 
       // Win probability + odds-derived payout multiplier (stake-scaled)
       const pEff = effectiveWinProbability(line);
       winChance.textContent = `${Math.round(pEff * 100)}%`;
 
       const multRaw = payoutMultiplierFromP(pEff);
-      const mult = clamp(multRaw, 1.10, 8.00);
+      // Keep the UI sane, but do NOT cap the user's stake.
+      const mult = clamp(multRaw, 1.05, 25.0);
 
-      // User can only wager up until the payout would equal the ticket price.
-      const maxStake = (ticketPriceCap > 0 && line > 0) ? (ticketPriceCap / mult) : 0;
+      // Minimum (and default) stake is 10% of the ticket subtotal (price * qty) or $10.
+      const minStake = minStakeForTicket(ticketSubtotal);
+      const stakeState = readStakeInput(minStake);
+      const stakeIsValid = stakeState.valid || (!stakeInputTouched && stakeState.empty);
 
-      // Enforce base stake + cap
-      const minStake = 10;
-      stake = Number(stake) || minStake;
+      // Initialize stake to the minimum once, but allow users to clear/edit the field.
+      if (!Number.isFinite(stake) || stake <= 0) stake = minStake;
       stake = Math.max(minStake, stake);
-      // Only clamp down if the cap is >= the minimum stake; otherwise we'll
-      // keep the minimum stake selected but disable betting for this line.
-      if (maxStake >= minStake) stake = Math.min(stake, maxStake);
+      if (stakeState.valid) {
+        stake = stakeState.value;
+      }
 
       if (stakeInput) {
-        stakeInput.value = stake.toFixed(2);
-        if (maxStake > 0) {
-          stakeInput.max = maxStake.toFixed(2);
+        if (!stakeInputTouched && stakeState.empty) {
+          stakeInput.value = stake.toFixed(2);
         }
+        // No max cap (effectively infinity)
+        stakeInput.removeAttribute("max");
+        stakeInput.min = minStake.toFixed(2);
+        stakeInput.placeholder = minStake.toFixed(2);
+        stakeInput.setAttribute("aria-invalid", stakeState.valid || stakeState.empty ? "false" : "true");
       }
       stakeAmt.textContent = money(stake);
 
-      // Payout if win (stake-scaled), capped at ticket price.
-      const payoutIfWin = (ticketPriceCap > 0 && line > 0) ? Math.min(ticketPriceCap, stake * mult) : 0;
+      // Payout if win (stake-scaled). No cap.
+      const payoutIfWin = (ticketSubtotal > 0 && line > 0) ? (stake * mult) : 0;
       payoutAmt.textContent = payoutIfWin > 0 ? money(payoutIfWin) : "—";
 
-      // Show "coverage" as a percent of the ticket price that would be covered.
-      const pct = (ticketPriceCap > 0 && payoutIfWin > 0) ? (payoutIfWin / ticketPriceCap) : 0;
-      coveragePct.textContent = (ticketPriceCap > 0) ? `${Math.round(pct * 100)}%` : "—";
+      // Show "coverage" as percent of ticket subtotal this payout would cover.
+      const pct = (ticketSubtotal > 0 && payoutIfWin > 0) ? (payoutIfWin / ticketSubtotal) : 0;
+      coveragePct.textContent = (ticketSubtotal > 0) ? `${Math.round(pct * 100)}%` : "—";
 
       // Rainline is always available, but line must be > 0.00" and we need a valid ticket price.
-      const canBet = (ticketPriceCap > 0) && (line > 0) && (maxStake >= minStake);
+      const canBet = (ticketSubtotal > 0) && (line > 0) && (stakeIsValid);
       placeBet.disabled = !canBet;
       placeBet.textContent = canBet ? "Save Rainline bet" : "Unavailable";
 
       // If forecast missing, still allow betting but show a warning in text
       if (!forecastAvailable) {
-        // Keep existing detail text, but ensure there's at least a note when forecasts aren't available.
         forecastText.textContent = forecastText.textContent || "Forecast unavailable for this date/location.";
       }
 
-      // Helpful hint when the cap is binding
-      if (ticketPriceCap > 0 && line > 0 && stakeInput) {
-        if (maxStake > 0 && maxStake < minStake) {
-          stakeInput.title = "Ticket price is too low to place the $10 minimum stake at these odds.";
-        } else if (maxStake > 0) {
-          stakeInput.title = `Max stake for this line: ${money(maxStake)} (payout capped at ticket price).`;
-        }
+      // UX hint: show the computed minimum in the stake input tooltip
+      if (stakeInput && ticketSubtotal >= 0) {
+        stakeInput.title = `Minimum stake is 10% of your ticket total or $10, whichever is greater: ${money(minStake)}.`;
       }
     }
 
@@ -669,7 +789,7 @@
     eventType?.addEventListener("change", () => updateRainLineUI());
 
     resetDemo?.addEventListener("click", () => {
-      qty = 2;
+      qty = 1;
       isOutdoor = true;
       outdoorSelect.value = "true";
       eventType.value = "concert";
@@ -682,20 +802,36 @@
     rainLine?.addEventListener("input", () => updateRainLineUI());
 
     stakeInput?.addEventListener("input", () => {
-      stake = Math.max(10, Number(stakeInput.value) || 10);
+      stakeInputTouched = true;
+      // updateRainLineUI() will enforce the dynamic minimum stake (10% of ticket total)
+      stake = Number(stakeInput.value) || stake;
       updateRainLineUI();
     });
 
-    // Save Rainline bet (no projected win/loss at checkout)
+// Save Rainline bet (no projected win/loss at checkout)
     placeBet?.addEventListener("click", () => {
       const line = Number(rainLine.value || 0);
-      const { ticketWithFees, ticketSubtotal, svcFee } = computeFees();
+      const { ticketWithFees, ticketSubtotal } = computeFees();
 
-      // Cap payout at ticket price (before fees)
-      const ticketPriceCap = ticketSubtotal;
+      const ticketTotal = ticketSubtotal; // before fees; stake minimum is based on this
       const pEff = effectiveWinProbability(line);
-      const mult = clamp(payoutMultiplierFromP(pEff), 1.10, 8.00);
-      const maxStake = (ticketPriceCap > 0 && line > 0) ? (ticketPriceCap / mult) : 0;
+      const mult = clamp(payoutMultiplierFromP(pEff), 1.05, 25.0);
+
+      const minStake = minStakeForTicket(ticketTotal);
+      const stakeState = readStakeInput(minStake);
+      if (!stakeState.valid) {
+        betResult.style.display = "block";
+        betResult.classList.remove("good", "neutral");
+        betResult.classList.add("bad");
+        betTitle.textContent = "Invalid stake";
+        if (stakeState.reason === "below_min") {
+          betText.textContent = `Stake must be at least ${money(minStake)}.`;
+        } else {
+          betText.textContent = "Enter a valid, positive stake amount.";
+        }
+        return;
+      }
+      stake = stakeState.value;
 
       if (line <= 0) {
         betResult.style.display = "block";
@@ -706,7 +842,7 @@
         return;
       }
 
-      if (!(ticketPriceCap > 0)) {
+      if (!(ticketTotal > 0)) {
         betResult.style.display = "block";
         betResult.classList.remove("good", "neutral");
         betResult.classList.add("bad");
@@ -715,19 +851,8 @@
         return;
       }
 
-      if (maxStake < 10) {
-        betResult.style.display = "block";
-        betResult.classList.remove("good", "neutral");
-        betResult.classList.add("bad");
-        betTitle.textContent = "Stake too high";
-        betText.textContent = "At this line, the $10 minimum stake would exceed the max payout cap (ticket price).";
-        return;
-      }
-
-      // Ensure we store a valid stake under the cap
-      stake = Math.max(10, Number(stake) || 10);
-      stake = Math.min(stake, maxStake);
-      const payoutIfWin = Math.min(ticketPriceCap, stake * mult);
+      // Payout if win (not capped)
+      const payoutIfWin = stake * mult;
 
       // Store a single order-like object for claim demo.
       // If a pending Rainline already exists for this event, update it
@@ -767,7 +892,7 @@
         lineIn: line,
         status: "pending",
         payoutIfWin,
-        ticketPriceCap
+        ticketTotal
       };
       order.updatedAt = new Date().toISOString();
       setStoredOrder(order);
@@ -870,8 +995,7 @@
         `Venue: ${order.event?.venue || "—"}`,
         `Outdoor: ${order.event?.outdoor ? "Yes" : "No"}`,
         `Tickets: ${order.qty || 1}`,
-        `Total paid: ${money(order.pricing?.total || 0)}`,
-      ];
+        `Total paid: ${money(order.pricing?.total || 0)}`];
 
       if (order.raincheck?.mode === "rainline") {
         lines.push("—");

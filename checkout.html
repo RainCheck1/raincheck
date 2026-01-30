@@ -3,7 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>TicketHub Checkout (Demo) — RainCheck</title>
+  <title>RainCheck</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext x='50%25' y='50%25' font-size='52' text-anchor='middle' dominant-baseline='central'%3E%E2%98%94%3C/text%3E%3C/svg%3E" />
   <link rel="stylesheet" href="styles.css" />
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -12,14 +13,15 @@
 </head>
 <body class="demoSite">
   <header class="topbar">
-    <div class="brand">
-      <div class="logo" aria-hidden="true">🎟️</div>
+    <a href="index.html" class="brand">
+      <div class="logo" aria-hidden="true">☔</div>
       <div>
-        <div class="brandName">TicketHub <span class="beta">DEMO</span></div>
-        <div class="brandTag">Checkout mock for RainCheck overlay</div>
+        <div class="brandName">RainCheck</div>
+        <div class="brandTag">Checkout</div>
       </div>
-    </div>
+    </a>
 
+    
     <nav class="nav">
       <a href="index.html">RainCheck Home</a>
       <a href="explore.html">Explore events</a>
@@ -29,66 +31,78 @@
 
   <main class="wrap">
     <div class="split">
-      <section class="card">
-        <div class="row space">
-          <div>
+      <section class="card checkoutCard">
+        <div class="checkoutHeader">
+          <div class="eventMedia eventMediaWrap">
+            <img id="eventImage" alt="Event image" style="display:none;" />
+          </div>
+          <div class="eventDetails">
             <div class="kicker">Event</div>
-            <div class="eventMedia" style="height:180px; margin-top:10px;">
-              <img id="eventImage" alt="Event image" style="display:none;" />
-            </div>
             <div class="cardTitle" id="eventName">Summer Stadium Concert</div>
             <div class="muted" id="eventMeta">Sat • 7:30 PM • Outdoor Venue</div>
             <div class="muted small" id="eventVenue">—</div>
-          </div>
-          <div class="tag good" id="eligTag">Rainline available</div>
-        </div>
-
-        <hr class="sep"/>
-
-        <div class="row space">
-          <div>
-            <div class="label">Tickets</div>
-          </div>
-          <div class="qty">
-            <button class="iconBtn" data-action="dec" aria-label="decrease">−</button>
-            <span id="qty">2</span>
-            <button class="iconBtn" data-action="inc" aria-label="increase">+</button>
+            <div class="tag good" id="eligTag">Rainline available</div>
           </div>
         </div>
 
-        <div class="lineItems">
-          <div class="li">
-            <span>Ticket price</span>
-            <span id="ticketPrice">$150.00</span>
+        <div class="checkoutSection">
+          <div class="row space">
+            <div>
+              <div class="label">Tickets</div>
+              <div class="muted small">Charged by Ticketmaster</div>
+            </div>
+            <div class="qty">
+              <button class="iconBtn" data-action="dec" aria-label="decrease">−</button>
+              <span id="qty">1</span>
+              <button class="iconBtn" data-action="inc" aria-label="increase">+</button>
+            </div>
           </div>
-          <div class="li" id="rainStakeRow" style="display:none;">
-            <span>Rainline stake</span>
-            <span id="rainStake">$0.00</span>
-          </div>
-          <div class="li">
-            <span>Service fee</span>
-            <span id="svcFee">$22.50</span>
-          </div>
-          <div class="li">
-            <span>Order processing</span>
-            <span id="procFee">$6.00</span>
+
+          <div class="lineItems">
+            <div class="li">
+              <span>Ticket price</span>
+              <span id="ticketPrice">$150.00</span>
+            </div>
+            <div class="li">
+              <span>Service fee</span>
+              <span id="svcFee">$22.50</span>
+            </div>
+            <div class="li">
+              <span>Order processing</span>
+              <span id="procFee">$6.00</span>
+            </div>
           </div>
         </div>
 
-        <hr class="sep"/>
-
-        <div class="row space bigTotal">
-          <span>Total</span>
-          <span id="grandTotal">$357.00</span>
+        <div class="checkoutSection">
+          <div class="row space">
+            <div>
+              <div class="label">Rainline stake</div>
+              <div class="muted small">Charged by RainCheck after you save a bet</div>
+            </div>
+          </div>
+          <div class="lineItems">
+            <div class="li" id="rainStakeRow">
+              <span>Stake</span>
+              <span id="rainStake">$0.00</span>
+            </div>
+          </div>
         </div>
 
-        <div class="row space">
-          <button class="btn primary" id="payBtn">Pay now</button>
-          <button class="btn" id="toggleExtensionBtn">Toggle RainCheck panel</button>
-        </div>
+        <div class="checkoutSection total">
+          <div class="row space bigTotal">
+            <span>Total</span>
+            <span id="grandTotal">$357.00</span>
+          </div>
 
-        <div class="muted small">
-          Tip: Pick an event in <a href="explore.html" class="link">Explore</a>, then come here — it’ll prefill the checkout.
+          <div class="checkoutActions">
+            <button class="btn primary" id="payBtn">Pay now</button>
+            <button class="btn" id="toggleExtensionBtn">Toggle RainCheck panel</button>
+          </div>
+
+          <div class="muted small tip">
+            Tip: Pick an event in <a href="explore.html" class="link">Explore</a>, then come here — it’ll prefill the checkout.
+          </div>
         </div>
       </section>
 
@@ -127,7 +141,7 @@
               <div class="label">Rain line (inches)</div>
               <div class="mono" id="rainLineValue">0.25"</div>
             </div>
-            <input id="rainLine" type="range" min="0.01" max="1.50" step="0.01" value="0.25" />
+            <input id="rainLine" type="range" min="0.01" max="1.00" step="0.01" value="0.25" />
           </div>
 
           <div class="grid2" style="margin-top:12px;">
@@ -141,8 +155,8 @@
               <div class="statValue">
                 <span id="stakeAmt">$10.00</span>
               </div>
-              <div class="muted small">Base price is $10. You can increase it.</div>
-              <input id="stakeInput" type="number" min="10" step="1" value="10" style="margin-top:8px; width:100%;" />
+              <div class="muted small">Minimum stake is 10% of your ticket total or $10, whichever is greater. You can increase it.</div>
+              <input id="stakeInput" type="number" min="0" step="0.01" value="" style="margin-top:8px; width:100%;" />
             </div>
           </div>
 
