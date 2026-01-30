@@ -119,6 +119,30 @@ h2{font-size:22px; margin:0 0 14px}
 .footer{margin-top:36px; padding-top:14px; border-top:1px solid var(--line)}
 .footerNote{margin-top:10px;}
 
+.rainOverlay{
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+  z-index:2;
+  overflow:hidden;
+}
+.rainOverlay span{
+  position:absolute;
+  top:-120px;
+  width:2px;
+  height:34px;
+  background: linear-gradient(180deg, rgba(99,91,255,0), rgba(99,91,255,.45), rgba(0,212,255,.7));
+  animation: rainFall linear infinite;
+}
+.rainOverlay.fade{
+  opacity:0;
+  transition: opacity .6s ease;
+}
+@keyframes rainFall{
+  0%{transform: translateY(-120px)}
+  100%{transform: translateY(calc(100vh + 120px))}
+}
+
 .row{display:flex; align-items:center; gap:12px}
 .space{justify-content:space-between}
 .resultsRow{align-items:baseline}
