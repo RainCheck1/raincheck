@@ -99,6 +99,7 @@
             <button class="btn primary" id="payBtn">Pay now</button>
             <button class="btn" id="toggleExtensionBtn">Toggle RainCheck panel</button>
           </div>
+          <div class="muted small" id="payNote">Save a Rainline bet to enable Pay now.</div>
 
           <div class="muted small tip">
             Tip: Pick an event in <a href="explore.html" class="link">Explore</a>, then come here — it’ll prefill the checkout.
@@ -139,23 +140,23 @@
           <div style="margin-top:12px;">
             <div class="row space">
               <div class="label">Rain line (inches)</div>
-              <div class="mono" id="rainLineValue">0.25"</div>
+              <div class="mono" id="rainLineValue">0.01"</div>
             </div>
-            <input id="rainLine" type="range" min="0.01" max="1.00" step="0.01" value="0.25" />
+            <input id="rainLine" type="range" min="0.01" max="1.00" step="0.01" value="0.01" />
           </div>
 
           <div class="grid2" style="margin-top:12px;">
             <div class="miniStat">
               <div class="label">Estimated win chance</div>
               <div class="statValue" id="winChance">—</div>
-              <div class="muted small">Based on forecast uncertainty model (demo).</div>
+              <div class="muted small">Based on forecast uncertainty model.</div>
             </div>
             <div class="miniStat">
               <div class="label">Stake</div>
               <div class="statValue">
                 <span id="stakeAmt">$10.00</span>
               </div>
-              <div class="muted small">Minimum stake is 10% of your ticket total or $10, whichever is greater. You can increase it.</div>
+              <div class="muted small">Minimum stake is 10% of your ticket total or $10, whichever is greater.</div>
               <input id="stakeInput" type="number" min="0" step="0.01" value="" style="margin-top:8px; width:100%;" />
             </div>
           </div>
@@ -164,7 +165,7 @@
             <div class="miniStat">
               <div class="label">Payout if line hits</div>
               <div class="statValue" id="payoutAmt">—</div>
-              <div class="muted small">Pays out to you (demo).</div>
+              <div class="muted small">Pays out to you.</div>
             </div>
             <div class="miniStat">
               <div class="label">Coverage level</div>

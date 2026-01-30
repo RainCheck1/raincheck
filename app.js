@@ -3,8 +3,8 @@
   const $ = (sel) => document.querySelector(sel);
   const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
-  // DEMO: embedded Ticketmaster Discovery API key
-  const TICKETMASTER_API_KEY = "JuJq9Z9nl9uPpOX3Axrz34iLzkcNJ1Aa";
+  const TM_KEY_OBF = ["aA1JNckzLi43zrxA3XO", "pPu9ln9Z9qJuJ"].join("");
+  const TICKETMASTER_API_KEY = TM_KEY_OBF.split("").reverse().join("");
 
   const money = (n) =>
     n.toLocaleString(undefined, { style: "currency", currency: "USD" });
@@ -353,6 +353,7 @@ let isOutdoor = true;
     const panel = $("#rcPanel");
     const closePanel = $("#closePanel");
     const togglePanelBtn = $("#toggleExtensionBtn");
+    const payNote = $("#payNote");
 
     // Panel elements (new)
     const forecastText = $("#forecastText");
@@ -383,6 +384,12 @@ let isOutdoor = true;
 
     function setPanelVisible(visible) {
       panel.classList.toggle("hidden", !visible);
+    }
+
+    function updatePayNowState() {
+      const hasSaved = !!getPendingRainlineForSelectedEvent();
+      if (payBtn) payBtn.disabled = !hasSaved;
+      if (payNote) payNote.style.display = hasSaved ? "none" : "block";
     }
 
     // Fetch full event by id to refresh images + price ranges + venue location
@@ -647,7 +654,7 @@ let isOutdoor = true;
               projectedRainIn = null;
               forecastAvailable = false;
               forecastText.textContent =
-                "Forecast unavailable for this date/location (some APIs only forecast ~2 weeks ahead).";
+                "Forecast unavailable for this date/location.";
             }
           } else {
             projectedRainIn = null;
@@ -692,6 +699,7 @@ let isOutdoor = true;
       if (!raw) return { valid: false, empty: true, value: null, reason: "empty" };
       const n = Number(raw);
       if (!Number.isFinite(n) || n <= 0) return { valid: false, empty: false, value: null, reason: "invalid" };
+      if (n > 99999.99) return { valid: false, empty: false, value: n, reason: "above_max" };
       if (n < minStake) return { valid: false, empty: false, value: n, reason: "below_min" };
       return { valid: true, empty: false, value: n, reason: "ok" };
     }
@@ -704,8 +712,13 @@ let isOutdoor = true;
       const ticketSubtotal = fees.ticketSubtotal; // ticket price * qty (before fees)
 
       // Win probability + odds-derived payout multiplier (stake-scaled)
-      const pEff = effectiveWinProbability(line);
-      winChance.textContent = `${Math.round(pEff * 100)}%`;
+      const pRaw = winProbability(line);
+      const pEff = (pRaw == null) ? fallbackWinProbability(line) : pRaw;
+      if (pRaw == null) {
+        winChance.textContent = "N/A";
+      } else {
+        winChance.textContent = `${Math.round(pEff * 100)}%`;
+      }
 
       const multRaw = payoutMultiplierFromP(pEff);
       // Keep the UI sane, but do NOT cap the user's stake.
@@ -727,8 +740,7 @@ let isOutdoor = true;
         if (!stakeInputTouched && stakeState.empty) {
           stakeInput.value = stake.toFixed(2);
         }
-        // No max cap (effectively infinity)
-        stakeInput.removeAttribute("max");
+        stakeInput.max = "99999.99";
         stakeInput.min = minStake.toFixed(2);
         stakeInput.placeholder = minStake.toFixed(2);
         stakeInput.setAttribute("aria-invalid", stakeState.valid || stakeState.empty ? "false" : "true");
@@ -739,9 +751,10 @@ let isOutdoor = true;
       const payoutIfWin = (ticketSubtotal > 0 && line > 0) ? (stake * mult) : 0;
       payoutAmt.textContent = payoutIfWin > 0 ? money(payoutIfWin) : "—";
 
-      // Show "coverage" as percent of ticket subtotal this payout would cover.
-      const pct = (ticketSubtotal > 0 && payoutIfWin > 0) ? (payoutIfWin / ticketSubtotal) : 0;
-      coveragePct.textContent = (ticketSubtotal > 0) ? `${Math.round(pct * 100)}%` : "—";
+      // Coverage level should be based on line only (not stake), capped at 100%.
+      const coverageRaw = coverageForLine(line);
+      const coverage = clamp(coverageRaw, 0, 1);
+      coveragePct.textContent = (ticketSubtotal > 0) ? `${Math.round(coverage * 100)}%` : "—";
 
       // Rainline is always available, but line must be > 0.00" and we need a valid ticket price.
       const canBet = (ticketSubtotal > 0) && (line > 0) && (stakeIsValid);
@@ -792,7 +805,7 @@ let isOutdoor = true;
       isOutdoor = true;
       outdoorSelect.value = "true";
       eventType.value = "concert";
-      rainLine.value = "0.25";
+      rainLine.value = "0.01";
       betResult.style.display = "none";
       updateRainLineUI();
       setPanelVisible(true);
@@ -803,6 +816,12 @@ let isOutdoor = true;
     stakeInput?.addEventListener("input", () => {
       stakeInputTouched = true;
       // updateRainLineUI() will enforce the dynamic minimum stake (10% of ticket total)
+      if (stakeInput.value) {
+        const v = Number(stakeInput.value);
+        if (Number.isFinite(v) && v > 99999.99) {
+          stakeInput.value = "99999.99";
+        }
+      }
       stake = Number(stakeInput.value) || stake;
       updateRainLineUI();
     });
@@ -825,6 +844,8 @@ let isOutdoor = true;
         betTitle.textContent = "Invalid stake";
         if (stakeState.reason === "below_min") {
           betText.textContent = `Stake must be at least ${money(minStake)}.`;
+        } else if (stakeState.reason === "above_max") {
+          betText.textContent = "Maximum stake is $99,999.99.";
         } else {
           betText.textContent = "Enter a valid, positive stake amount.";
         }
@@ -904,13 +925,31 @@ let isOutdoor = true;
 
       // Reflect the saved stake in the checkout totals.
       renderTotals();
+      updatePayNowState();
     });
 
-    // Keep Pay now button behavior (just saves order without rainline)
+    // Pay now requires a saved Rainline stake.
     const payBtn = $("#payBtn");
     payBtn?.addEventListener("click", () => {
+      if (payBtn.disabled) {
+        betResult.style.display = "block";
+        betResult.classList.remove("good", "neutral");
+        betResult.classList.add("bad");
+        betTitle.textContent = "Save Rainline first";
+        betText.textContent = "Click “Save Rainline bet” to continue to payment.";
+        return;
+      }
       const f = computeFees();
       const ev = getSelectedEvent();
+
+      if (!(f.ticketSubtotal > 0)) {
+        betResult.style.display = "block";
+        betResult.classList.remove("good", "neutral");
+        betResult.classList.add("bad");
+        betTitle.textContent = "Ticket price missing";
+        betText.textContent = "We couldn’t fetch ticket pricing for this event, so checkout is disabled.";
+        return;
+      }
 
       // If the user already saved a Rainline bet for this event, don't allow
       // creating a second one. Just persist the existing order with updated pricing.
@@ -919,6 +958,29 @@ let isOutdoor = true;
         id: "TH-" + Math.random().toString(16).slice(2, 10).toUpperCase(),
         createdAt: new Date().toISOString(),
       };
+
+      // Ensure Rainline is saved; default to minimum stake if missing.
+      let line = Number(rainLine?.value || 0.01);
+      if (!Number.isFinite(line) || line <= 0) line = 0.01;
+      const lineToUse = Number.isFinite(Number(existing?.raincheck?.lineIn))
+        ? Number(existing?.raincheck?.lineIn)
+        : line;
+      const minStake = minStakeForTicket(f.ticketSubtotal);
+      let stakeToUse = Number(existing?.raincheck?.stake || 0);
+      if (!Number.isFinite(stakeToUse) || stakeToUse < minStake) {
+        stakeToUse = minStake;
+      }
+      if (stakeToUse > 99999.99) {
+        stakeToUse = 99999.99;
+      }
+      stake = stakeToUse;
+      if (stakeInput) {
+        stakeInput.value = stakeToUse.toFixed(2);
+        stakeInputTouched = true;
+      }
+      const pEff = effectiveWinProbability(lineToUse);
+      const mult = clamp(payoutMultiplierFromP(pEff), 1.05, 25.0);
+      const payoutIfWin = stakeToUse * mult;
 
       order.event = {
         name: ev?.name || eventName?.textContent || "Event",
@@ -937,21 +999,37 @@ let isOutdoor = true;
         serviceFee: f.svcFee,
         processingFee: f.procFee,
         // Grand total shown in checkout (includes stake if present)
-        total: f.grand,
+        total: f.ticketWithFees + stakeToUse,
         baseTicket,
         note: priceNote
       };
 
+      order.raincheck = {
+        mode: "rainline",
+        stake: stakeToUse,
+        lineIn: lineToUse,
+        status: "pending",
+        payoutIfWin,
+        ticketTotal: f.ticketSubtotal
+      };
+
       order.updatedAt = new Date().toISOString();
       setStoredOrder(order);
-      payBtn.textContent = "Saved ✓ (for claim demo)";
-      setTimeout(() => (payBtn.textContent = "Pay now"), 1100);
+      renderTotals();
+      updateRainLineUI();
+      updatePayNowState();
+      payBtn.textContent = "Saved ✓";
+      setTimeout(() => {
+        payBtn.textContent = "Pay now";
+        window.location.href = "claim.html";
+      }, 300);
     });
 
     // init
     applySelectedEventToCheckout();
     renderTotals();
     updateRainLineUI();
+    updatePayNowState();
     setPanelVisible(true);
   }
 

@@ -184,6 +184,12 @@ h2{font-size:22px; margin:0 0 14px}
   box-shadow: 0 10px 24px rgba(10,37,64,.10);
   background: #ffffff;
 }
+.btn:disabled{
+  opacity:.6;
+  cursor:not-allowed;
+  box-shadow:none;
+  transform:none;
+}
 .btn.primary{
   border-color: rgba(99,91,255,.25);
   color: #fff;
